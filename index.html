@@ -93,7 +93,7 @@
     </div>
 
     <script>
-        // MASUKKAN URL WEB APP GOOGLE APPS SCRIPT-MU YANG BERAKHIRAN /exec DI SINI
+        // URL Web App GAS kamu sudah terpasang dengan benar
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxOCbna-jrSkdI_08UOsVQMZB3EBGCSvvkXtsl6EPI8YX8C68sfb-Wz4h_cXVIcuQLWUg/exec"; 
 
         const form = document.getElementById('serviceForm');
@@ -102,15 +102,41 @@
         const fileInput = document.getElementById('eviden');
         const fileError = document.getElementById('fileError');
 
-        const getBase64 = (file) => {
+        // Fungsi baru: Kompresi Gambar menggunakan Canvas
+        const compressImage = (file, maxWidth = 1024, quality = 0.7) => {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
                 reader.readAsDataURL(file);
-                reader.onload = () => resolve({
-                    filename: file.name,
-                    mimeType: file.type,
-                    base64: reader.result
-                });
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.src = event.target.result;
+                    img.onload = () => {
+                        let width = img.width;
+                        let height = img.height;
+
+                        // Kalkulasi rasio jika lebar lebih besar dari maxWidth
+                        if (width > maxWidth) {
+                            height = Math.round((height * maxWidth) / width);
+                            width = maxWidth;
+                        }
+
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        const compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+                        
+                        resolve({
+                            filename: file.name.split('.')[0] + '.jpg', // Ekstensi otomatis diseragamkan
+                            mimeType: 'image/jpeg',
+                            base64: compressedBase64
+                        });
+                    };
+                    img.onerror = error => reject(error);
+                };
                 reader.onerror = error => reject(error);
             });
         };
@@ -129,7 +155,8 @@
             loadingDiv.classList.remove('hidden');
 
             try {
-                const filePromises = Array.from(fileInput.files).map(file => getBase64(file));
+                // Menggunakan fungsi compressImage yang baru, bukan getBase64
+                const filePromises = Array.from(fileInput.files).map(file => compressImage(file, 1024, 0.7));
                 const imagesBase64 = await Promise.all(filePromises);
 
                 const payload = {
@@ -162,7 +189,7 @@
 
             } catch (error) {
                 console.error('Error:', error);
-                alert("Terjadi kesalahan sistem saat mengirim data.");
+                alert("Terjadi kesalahan sistem saat mengirim data. Pastikan koneksi stabil.");
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
